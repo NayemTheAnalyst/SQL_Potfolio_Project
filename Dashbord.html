@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Manufacturing Defect Analysis Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg: #F3F4F8;
+    --panel: #FFFFFF;
+    --ink: #1F2430;
+    --muted: #6B7280;
+    --accent: #2456E5;
+    --accent-soft: #E8EDFF;
+    --warn: #E5572B;
+    --warn-soft: #FDEAE3;
+    --good: #1E9E6F;
+    --good-soft: #E3F7EE;
+    --border: #E5E7EE;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family: 'Segoe UI', 'Inter', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 20px;
+  }
+  .header{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    margin-bottom: 18px;
+  }
+  .header h1{
+    font-size: 24px; font-weight:700; letter-spacing:-0.3px;
+  }
+  .header p{ color:var(--muted); font-size:13px; margin-top:4px;}
+  .header .badge{
+    background: var(--accent); color:#fff; font-size:12px; font-weight:600;
+    padding:6px 14px; border-radius:20px;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .kpi{
+    background: var(--panel); border-radius:10px; padding:16px 18px;
+    border:1px solid var(--border);
+    display:flex; flex-direction:column; gap:6px;
+  }
+  .kpi .label{ font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;}
+  .kpi .value{ font-size:28px; font-weight:700; }
+  .kpi .sub{ font-size:12px; color:var(--muted); }
+  .kpi.warn .value{ color: var(--warn); }
+  .kpi.good .value{ color: var(--good); }
+  .kpi.accent .value{ color: var(--accent); }
+
+  .row{
+    display:grid; gap:14px; margin-bottom:14px;
+  }
+  .row-3{ grid-template-columns: 1.1fr 1fr 1fr; }
+  .row-2{ grid-template-columns: 1.4fr 1fr; }
+
+  .panel{
+    background: var(--panel); border-radius:10px; border:1px solid var(--border);
+    padding:16px;
+  }
+  .panel h3{
+    font-size:14px; font-weight:700; margin-bottom:2px;
+  }
+  .panel .desc{ font-size:11.5px; color:var(--muted); margin-bottom:10px;}
+  .chart-wrap{ position:relative; height:230px; }
+  .chart-wrap.tall{ height: 280px; }
+
+  table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  th{ text-align:left; color:var(--muted); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--border); font-size:11px; text-transform:uppercase; letter-spacing:0.3px;}
+  td{ padding:7px 8px; border-bottom:1px solid var(--border); }
+  tr:last-child td{ border-bottom:none; }
+  .tag{
+    display:inline-block; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:700;
+  }
+  .tag.defect{ background:var(--warn-soft); color:var(--warn); }
+  .tag.ok{ background:var(--good-soft); color:var(--good); }
+
+  .footer-note{
+    font-size:11px; color:var(--muted); text-align:right; margin-top:6px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Manufacturing Defect Analysis Dashboard</h1>
+    <p>Production batch quality &amp; operations overview &middot; 3,240 batches</p>
+  </div>
+  <div class="badge">Power BI Layout Mockup</div>
+</div>
+
+<!-- KPI Cards -->
+<div class="grid">
+  <div class="kpi accent">
+    <div class="label">Total Batches</div>
+    <div class="value">3,240</div>
+    <div class="sub">Production records analyzed</div>
+  </div>
+  <div class="kpi warn">
+    <div class="label">Overall Defect Rate</div>
+    <div class="value">16.42%</div>
+    <div class="sub">532 defective batches</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Avg Production Cost</div>
+    <div class="value">$12,423</div>
+    <div class="sub">Per batch</div>
+  </div>
+  <div class="kpi good">
+    <div class="label">Avg Quality Score</div>
+    <div class="value">80.13</div>
+    <div class="sub">Out of 100</div>
+  </div>
+</div>
+
+<!-- Row 1: Distribution + Supplier Quality + Productivity Quartile -->
+<div class="row row-3">
+  <div class="panel">
+    <h3>Defect vs Non-Defect Distribution</h3>
+    <div class="desc">Q1 — Share of batches by defect status</div>
+    <div class="chart-wrap"><canvas id="chartDefectDist"></canvas></div>
+  </div>
+  <div class="panel">
+    <h3>Defect Rate by Supplier Quality</h3>
+    <div class="desc">Q5 — Higher supplier score ≠ fewer defects</div>
+    <div class="chart-wrap"><canvas id="chartSupplier"></canvas></div>
+  </div>
+  <div class="panel">
+    <h3>Defect Rate by Worker Productivity Quartile</h3>
+    <div class="desc">Q9 — Q4 (highest productivity) has lowest defect rate</div>
+    <div class="chart-wrap"><canvas id="chartProductivity"></canvas></div>
+  </div>
+</div>
+
+<!-- Row 2: Delivery Delay trend + Maintenance bucket -->
+<div class="row row-2">
+  <div class="panel">
+    <h3>Delivery Delay vs Average Defect Rate</h3>
+    <div class="desc">Q6 — Trend of avg defect rate across delivery delay days</div>
+    <div class="chart-wrap tall"><canvas id="chartDelay"></canvas></div>
+  </div>
+  <div class="panel">
+    <h3>Maintenance Hours vs Downtime &amp; Defect</h3>
+    <div class="desc">Q11 — Comparison across maintenance buckets</div>
+    <div class="chart-wrap tall"><canvas id="chartMaintenance"></canvas></div>
+  </div>
+</div>
+
+<!-- Row 3: Top 10 risky batches table -->
+<div class="panel">
+  <h3>Top 10 Batches by Safety Incidents</h3>
+  <div class="desc">Q7 — High-risk batches recommended for safety audit</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Production Volume</th>
+        <th>Safety Incidents</th>
+        <th>Maintenance Hours</th>
+        <th>Worker Productivity</th>
+        <th>Defect Status</th>
+      </tr>
+    </thead>
+    <tbody id="top10Body"></tbody>
+  </table>
+  <div class="footer-note">Source: production_data | Cleaned dataset, 3,240 rows</div>
+</div>
+
+<script>
+const accent = '#2456E5';
+const accentSoft = '#9DB6FF';
+const warn = '#E5572B';
+const good = '#1E9E6F';
+const muted = '#6B7280';
+const gridColor = '#EEF0F5';
+
+Chart.defaults.font.family = "'Segoe UI', Arial, sans-serif";
+Chart.defaults.color = '#4B5363';
+
+// Q1 - Donut
+new Chart(document.getElementById('chartDefectDist'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Non Defect', 'Defect'],
+    datasets: [{
+      data: [2708, 532],
+      backgroundColor: [good, warn],
+      borderWidth: 0
+    }]
+  },
+  options: {
+    maintainAspectRatio: false,
+    cutout: '65%',
+    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font:{size:11} } } }
+  }
+});
+
+// Q5 - Supplier Quality bucket
+new Chart(document.getElementById('chartSupplier'), {
+  type: 'bar',
+  data: {
+    labels: ['Medium (70-85)', 'High (>85)'],
+    datasets: [{
+      label: 'Defect Rate %',
+      data: [15.57, 16.72],
+      backgroundColor: [accentSoft, accent],
+      borderRadius: 6,
+      maxBarThickness: 60
+    }]
+  },
+  options: {
+    maintainAspectRatio: false,
+    scales: {
+      y: { beginAtZero:true, max:20, grid:{color:gridColor}, ticks:{callback:v=>v+'%'} },
+      x: { grid:{display:false} }
+    },
+    plugins: { legend: { display:false } }
+  }
+});
+
+// Q9 - Productivity Quartile
+new Chart(document.getElementById('chartProductivity'), {
+  type: 'bar',
+  data: {
+    labels: ['Q1 (Low)', 'Q2', 'Q3', 'Q4 (High)'],
+    datasets: [{
+      label: 'Defect Rate %',
+      data: [16.05, 16.79, 17.90, 14.94],
+      backgroundColor: ctx => ctx.dataIndex === 3 ? good : accent,
+      borderRadius: 6,
+      maxBarThickness: 45
+    }]
+  },
+  options: {
+    maintainAspectRatio: false,
+    scales: {
+      y: { beginAtZero:true, max:20, grid:{color:gridColor}, ticks:{callback:v=>v+'%'} },
+      x: { grid:{display:false} }
+    },
+    plugins: { legend: { display:false } }
+  }
+});
+
+// Q6 - Delivery Delay line
+new Chart(document.getElementById('chartDelay'), {
+  type: 'line',
+  data: {
+    labels: ['0', '1', '2', '3', '4', '5'],
+    datasets: [{
+      label: 'Avg Defect Rate',
+      data: [2.74, 2.80, 2.85, 2.72, 2.68, 2.72],
+      borderColor: accent,
+      backgroundColor: 'rgba(36,86,229,0.08)',
+      fill: true,
+      tension: 0.35,
+      pointRadius: 4,
+      pointBackgroundColor: accent
+    }]
+  },
+  options: {
+    maintainAspectRatio: false,
+    scales: {
+      y: { grid:{color:gridColor}, title:{display:true, text:'Avg Defect Rate'} },
+      x: { grid:{display:false}, title:{display:true, text:'Delivery Delay (days)'} }
+    },
+    plugins: { legend: { display:false } }
+  }
+});
+
+// Q11 - Maintenance bucket grouped bars
+new Chart(document.getElementById('chartMaintenance'), {
+  type: 'bar',
+  data: {
+    labels: ['Low (<5 hrs)', 'Medium (5-15 hrs)', 'High (>15 hrs)'],
+    datasets: [
+      {
+        label: 'Avg Downtime %',
+        data: [2.51, 2.52, 2.47],
+        backgroundColor: accent,
+        borderRadius: 5,
+        maxBarThickness: 35
+      },
+      {
+        label: 'Avg Defect Rate',
+        data: [2.77, 2.73, 2.76],
+        backgroundColor: warn,
+        borderRadius: 5,
+        maxBarThickness: 35
+      }
+    ]
+  },
+  options: {
+    maintainAspectRatio: false,
+    scales: {
+      y: { beginAtZero:true, grid:{color:gridColor} },
+      x: { grid:{display:false} }
+    },
+    plugins: { legend: { position:'bottom', labels:{boxWidth:12, font:{size:11}} } }
+  }
+});
+
+// Top 10 table
+const top10 = [
+  {vol:109, si:9, mh:10, wp:91.69, status:'Non Defect'},
+  {vol:990, si:9, mh:3,  wp:91.51, status:'Non Defect'},
+  {vol:100, si:9, mh:19, wp:80.22, status:'Non Defect'},
+  {vol:116, si:9, mh:17, wp:82.39, status:'Defect'},
+  {vol:475, si:9, mh:14, wp:87.20, status:'Non Defect'},
+  {vol:473, si:9, mh:11, wp:81.81, status:'Non Defect'},
+  {vol:120, si:9, mh:20, wp:89.36, status:'Non Defect'},
+  {vol:484, si:9, mh:17, wp:99.01, status:'Non Defect'},
+  {vol:482, si:9, mh:9,  wp:96.99, status:'Defect'},
+  {vol:460, si:9, mh:0,  wp:99.88, status:'Non Defect'}
+];
+
+const tbody = document.getElementById('top10Body');
+top10.forEach(r => {
+  const tr = document.createElement('tr');
+  const tagClass = r.status === 'Defect' ? 'defect' : 'ok';
+  tr.innerHTML = `
+    <td>${r.vol}</td>
+    <td>${r.si}</td>
+    <td>${r.mh}</td>
+    <td>${r.wp}</td>
+    <td><span class="tag ${tagClass}">${r.status}</span></td>
+  `;
+  tbody.appendChild(tr);
+});
+</script>
+
+</body>
+</html>
