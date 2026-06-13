@@ -1,7 +1,8 @@
 # SQL_Potfolio_Project
 Manufacturing Data Analysis with SQL and Power BI Dashbord.
 
-SELECT * FROM potfoli_project.production_data;
+SELECT * 
+FROM potfoli_project.production_data;
 
 /* 
 	Total number of records and Defect vs Non-Defect count
